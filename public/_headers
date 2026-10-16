@@ -1,0 +1,27 @@
+# 静态资源层的基线安全头。
+# 动态路由（/api、/webdav）与全部响应另有 functions/_middleware.ts 统一补头，
+# 那里是权威来源；这里保证即使中间件未命中也不会裸奔。
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+# 内置的默认站点图标（未配置自定义品牌时使用）。文件名不含内容哈希，只给短缓存。
+/favicon.png
+  Cache-Control: public, max-age=86400
+
+/logo144.png
+  Cache-Control: public, max-age=86400
+
+# 自定义品牌素材，由 tools/build-branding.mjs 在构建期产出。
+# 虽然素材出自站点所有者之手，仍按不可信输入做隔离，原因有二：
+#   1. _middleware.ts 的 CSP 只作用于动态路由，静态资源拿不到，必须在这里单独收紧；
+#   2. sandbox 指令让「直接在地址栏打开 SVG」时它运行在独立源中 —— 即便素材里
+#      混进了脚本，也读不到本站 localStorage，而写操作口令正存在那里。
+# 文件名固定、URL 带 ?v=<内容哈希>，因此可以放心长期强缓存。
+/branding/*
+  Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; sandbox
+  X-Content-Type-Options: nosniff
+  Cache-Control: public, max-age=31536000, immutable

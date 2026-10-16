@@ -1,0 +1,22 @@
+name = "ytodb"
+pages_build_output_dir = "build"
+compatibility_date = "2024-06-20"
+
+# 共享网盘：只读免密（浏览/下载/WebDAV 读取），写操作需管理口令。
+#
+# 这里的 name 与下面的 bucket_name 沿用了作者线上部署所用的值，保持本文件可直接
+# 重新部署；部署到你自己的 Cloudflare 账号时，请把这两项改成你自己的项目名与桶名。
+#
+# ADMIN_PASSWORD 属于秘密，绝不写进本文件：
+#   生产环境：wrangler pages secret put ADMIN_PASSWORD --project-name <你的 Pages 项目名>
+#   本地预览：写进 .dev.vars（已在 .gitignore 中）
+# 未配置 ADMIN_PASSWORD 时，所有写操作一律返回 503（fail closed），只读浏览不受影响。
+[vars]
+ADMIN_USER = "admin"
+# 回收站保留天数；-1 关闭自动清理，0 表示全部视为过期
+TRASH_RETENTION_DAYS = "30"
+
+[[r2_buckets]]
+binding = "BUCKET"
+# 注意：R2 桶名只允许小写字母/数字/连字符（3-63 位），不能出现大写字母或下划线。
+bucket_name = "ytodb"

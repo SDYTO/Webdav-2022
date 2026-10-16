@@ -1,0 +1,41 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+/.vscode
+/.wrangler
+.dev.vars
+
+# 本地预览工具产物（R2 模拟数据落在系统临时目录，不在仓库内）
+/tools/.generated/
+
+# 本地排障临时目录：含部署凭据、账户 ID、DNS 记录等，绝不入库
+/.seed/
+
+# 内部评估稿（针对本部署的安全评估与待办，非对外文档；内容要点已并入 SECURITY.md）
+/评估报告-安全与LOGO.md
+
+# 品牌构建产物：源是 branding/ 目录，由 tools/build-branding.mjs 在 predev/prebuild 生成。
+# branding/branding.generated.ts 是例外 —— 它要参与类型检查，所以提交进仓库。
+/public/branding/
+/public/manifest.json

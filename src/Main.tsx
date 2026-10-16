@@ -1,0 +1,863 @@
+import { isPreviewable } from "./app/preview";
+import React, {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { FolderOpen as FolderOpenIcon, SearchOff as SearchOffIcon } from "@mui/icons-material";
+
+import ConfirmDialog from "./ConfirmDialog";
+import CreateFolderDialog from "./CreateFolderDialog";
+import EmptyState from "./EmptyState";
+import ExplorerBar, { ExplorerSection } from "./ExplorerBar";
+import FileActionSheet, { FileAction } from "./FileActionSheet";
+import FileGrid, { FileGridSkeleton } from "./FileGrid";
+import FileInfoSidebar from "./FileInfoSidebar";
+import MobileNav from "./MobileNav";
+import MoveDialog from "./MoveDialog";
+import MultiSelectToolbar from "./MultiSelectToolbar";
+import PathBar, { SearchScope } from "./PathBar";
+import RenameDialog from "./RenameDialog";
+import TrashView from "./TrashView";
+import WebDavPanel from "./WebDavPanel";
+import { useClipboard } from "./app/clipboard";
+import { NotifyFn } from "./app/notify";
+import { Route } from "./app/route";
+import { Density, FileTypeFilter, SortPref, usePersistedState, ViewMode } from "./app/prefs";
+import { Z_INDEX, warmShadow } from "./app/theme";
+import { pushRecent, RecentEntry, useRecent } from "./app/recent";
+import { strings, translate } from "./app/strings";
+import {
+  createFolder,
+  downloadFolderArchive,
+  downloadSelectionArchive,
+  downloadFile,
+  openFile,
+  selectDirectoryFiles,
+} from "./app/transfer";
+import { useUploadInputs } from "./app/useUploadInputs";
+import { useDragDropUpload } from "./app/useDragDropUpload";
+import { useFolderCounts } from "./app/useFolderCounts";
+import { useFolderListing } from "./app/useFolderListing";
+import { useKeyboardShortcuts } from "./app/useKeyboardShortcuts";
+import { useMultiSelect } from "./app/useMultiSelect";
+import { usePasteUpload } from "./app/usePasteUpload";
+import { FileItem } from "./app/types";
+import { errorMessage } from "./app/utils";
+import { parentKey } from "./app/interaction";
+import { useFileOperations } from "./app/useFileOperations";
+import { useListingStats, useVisibleFiles } from "./app/useVisibleFiles";
+
+// 重组件按需加载：只有真正打开预览时才拉取对应 chunk
+const PreviewDialog = lazy(() => import("./PreviewDialog"));
+
+function Main({
+  search,
+  onSearchChange,
+  onNotify,
+  view,
+  onViewChange,
+  sort,
+  onSortChange,
+  route,
+  navigate,
+  onContentScroll,
+  isAdmin,
+  onLogin,
+}: {
+  search: string;
+  onSearchChange: (search: string) => void;
+  onNotify: NotifyFn;
+  view: ViewMode;
+  onViewChange: (view: ViewMode) => void;
+  sort: SortPref;
+  onSortChange: (sort: SortPref) => void;
+  route: Route;
+  navigate: (route: Route) => void;
+  onContentScroll?: (scrolled: boolean) => void;
+  isAdmin: boolean;
+  onLogin: () => void;
+}) {
+  const {
+    clipboard,
+    copy: copyToClipboard,
+    cut: cutToClipboard,
+    clear: clearClipboard,
+  } = useClipboard();
+  const recents = useRecent();
+
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchScope, setSearchScope] = useState<SearchScope>("folder");
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [showWebDav, setShowWebDav] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<FileTypeFilter>("all");
+  const [showHidden, setShowHidden] = usePersistedState(
+    "flaredrive.showHidden",
+    false
+  );
+  const [density, setDensity] = usePersistedState<Density>(
+    "flaredrive.density",
+    "standard"
+  );
+  const [pendingOpen, setPendingOpen] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    file: FileItem;
+  } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
+  const [detailsFile, setDetailsFile] = useState<FileItem | null>(null);
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null);
+  const [moveTarget, setMoveTarget] = useState<string[] | null>(null);
+  const lastFolderPath = useRef("");
+
+  // 写操作统一入口：没有口令就先弹登录框，绝不放一个注定 401 的请求出去。
+  const requireAdmin = useCallback(() => {
+    if (isAdmin) return true;
+    onLogin();
+    return false;
+  }, [isAdmin, onLogin]);
+
+  // 跨 hook 的桥接：useFolderListing 在选择/计数 hook 之前声明，
+  // 通过 ref 转发其回调到后声明的 setter。
+  const folderCountsSetterRef = useRef<
+    (update: (prev: Record<string, number>) => Record<string, number>) => void
+  >(() => {});
+  const clearSelectionRef = useRef<() => void>(() => {});
+  const onListingLoaded = useCallback(
+    (path: string, count: number) => {
+      folderCountsSetterRef.current((prev) => ({ ...prev, [path]: count }));
+    },
+    []
+  );
+  const onListingChanged = useCallback(() => {
+    clearSelectionRef.current();
+  }, []);
+  const clearSelection = useCallback(() => {
+    clearSelectionRef.current();
+  }, []);
+
+  const cwd = route.kind === "folder" ? route.path : lastFolderPath.current;
+  const section: ExplorerSection = route.kind === "trash" ? "trash" : "folder";
+
+  const {
+    files,
+    listingPending,
+    isGlobalSearch,
+    loadListing,
+    searchHasMore,
+    loadMoreSentinelRef,
+  } = useFolderListing({
+    route,
+    cwd,
+    debouncedSearch,
+    searchScope,
+    onNotify,
+    onListingLoaded,
+    onListingChanged,
+  });
+
+  const { transferQueue, takenForCwd, enqueueToDir } = useUploadInputs({
+    cwd,
+    files,
+  });
+
+  useEffect(() => {
+    if (route.kind === "folder") lastFolderPath.current = route.path;
+  }, [route]);
+
+  const handleContentScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      onContentScroll?.(event.currentTarget.scrollTop > 8);
+    },
+    [onContentScroll]
+  );
+
+  useEffect(() => {
+    setSearchScope(cwd ? "folder" : "global");
+  }, [cwd]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    if (search.trim() && route.kind !== "folder") {
+      navigate({ kind: "folder", path: lastFolderPath.current });
+    }
+  }, [navigate, route.kind, search]);
+
+  const activeUploads = transferQueue.filter(
+    (task) =>
+      task.type === "upload" &&
+      ["pending", "in-progress", "paused"].includes(task.status)
+  ).length;
+  const previousActive = useRef(0);
+
+  useEffect(() => {
+    if (previousActive.current > 0 && activeUploads === 0) {
+      loadListing();
+    }
+    previousActive.current = activeUploads;
+  }, [activeUploads, loadListing]);
+
+  const { visibleFiles } = useVisibleFiles({
+    files,
+    sort,
+    showHidden,
+    typeFilter,
+    debouncedSearch,
+    searchScope,
+  });
+
+  const listingStats = useListingStats(visibleFiles);
+
+  const {
+    selectedKeys,
+    setSelectedKeys,
+    focusedKey,
+    setFocusedKey,
+    toggleSelect,
+    selectAll,
+    jumpFocused,
+    moveFocused,
+  } = useMultiSelect(visibleFiles);
+
+  useEffect(() => {
+    setFocusedKey(null);
+  }, [cwd, section, setFocusedKey]);
+
+  const { folderCounts, setFolderCounts } = useFolderCounts({
+    active: route.kind === "folder" && !isGlobalSearch,
+    visibleFiles,
+  });
+  folderCountsSetterRef.current = setFolderCounts;
+  clearSelectionRef.current = () => setSelectedKeys([]);
+
+  useEffect(() => {
+    if (focusedKey && !visibleFiles.some((file) => file.key === focusedKey)) {
+      setFocusedKey(null);
+    }
+  }, [focusedKey, setFocusedKey, visibleFiles]);
+
+  const navigateFolder = useCallback(
+    (path: string) => {
+      setDebouncedSearch("");
+      const normalized = path && !path.endsWith("/") ? `${path}/` : path;
+      navigate({ kind: "folder", path: normalized });
+      if (search) onSearchChange("");
+    },
+    [navigate, onSearchChange, search]
+  );
+
+  const openRecent = useCallback(
+    (entry: RecentEntry) => {
+      if (entry.isDir) {
+        navigateFolder(entry.key);
+        return;
+      }
+      navigateFolder(parentKey(entry.key));
+      setPendingOpen(entry.key);
+    },
+    [navigateFolder]
+  );
+
+  const rememberFolder = useCallback((key: string) => {
+    const file = files.find((item) => item.key === key);
+    if (file?.isDir) {
+      pushRecent({ key: file.key, name: file.name, isDir: true });
+    }
+    navigateFolder(key);
+  }, [files, navigateFolder]);
+
+  const handleOpenMenu = useCallback(
+    (position: { clientX: number; clientY: number }, file: FileItem) => {
+      setContextMenu({
+        x: position.clientX,
+        y: position.clientY,
+        file,
+      });
+    },
+    []
+  );
+
+  const handleOpen = useCallback(
+    (key: string) => {
+      const file = files.find((item) => item.key === key);
+      if (!file) return;
+      pushRecent({ key: file.key, name: file.name, isDir: false });
+      if (isPreviewable(file)) {
+        setPreviewFile(file);
+      } else {
+        openFile(key).catch((error) => onNotify(errorMessage(error), "error"));
+      }
+    },
+    [files, onNotify]
+  );
+
+  const previewSiblings = useMemo(() => {
+    if (!previewFile) return [];
+    const parent = parentKey(previewFile.key);
+    return visibleFiles.filter(
+      (item) =>
+        !item.isDir &&
+        isPreviewable(item) &&
+        parentKey(item.key) === parent
+    );
+  }, [previewFile, visibleFiles]);
+
+  const enqueueToCwd = useCallback(
+    (incoming: File[]) => enqueueToDir(incoming, cwd, takenForCwd),
+    [cwd, enqueueToDir, takenForCwd]
+  );
+
+  const beginRename = useCallback(
+    (file: FileItem) => {
+      if (!requireAdmin()) return;
+      setRenameTarget(file);
+    },
+    [requireAdmin]
+  );
+
+  const beginDelete = useCallback(
+    (keys: string[]) => {
+      if (!requireAdmin()) return;
+      setConfirmDelete(keys);
+    },
+    [requireAdmin]
+  );
+
+  const beginMove = useCallback(
+    (keys: string[]) => {
+      if (!requireAdmin()) return;
+      setMoveTarget(keys);
+    },
+    [requireAdmin]
+  );
+
+  useKeyboardShortcuts({
+    route,
+    visibleFiles,
+    selectedKeys,
+    focusedKey,
+    setSelectedKeys: clearSelection,
+    setFocusedKey,
+    moveFocused,
+    jumpFocused,
+    toggleSelect,
+    selectAll,
+    navigateFolder,
+    onOpen: handleOpen,
+    onRename: beginRename,
+    onDetails: setDetailsFile,
+    onDelete: beginDelete,
+  });
+
+  usePasteUpload({
+    active: route.kind === "folder" && isAdmin,
+    enqueueToCwd,
+    onNotify,
+  });
+
+  const dropActive = useDragDropUpload({
+    active: route.kind === "folder" && isAdmin,
+    enqueueToCwd,
+  });
+
+  const handleContextAction = useCallback(
+    async (action: FileAction, file: FileItem) => {
+      setContextMenu(null);
+      try {
+        if (action === "open") {
+          if (file.isDir) navigateFolder(file.key);
+          else handleOpen(file.key);
+        } else if (action === "download") {
+          if (file.isDir) await downloadFolderArchive(file.key);
+          else await downloadFile(file.key);
+        } else if (action === "details") {
+          setDetailsFile(file);
+        } else if (action === "rename") {
+          if (!requireAdmin()) return;
+          window.setTimeout(() => setRenameTarget(file), 50);
+        } else if (action === "move") {
+          if (!requireAdmin()) return;
+          window.setTimeout(() => setMoveTarget([file.key]), 50);
+        } else if (action === "delete") {
+          if (!requireAdmin()) return;
+          window.setTimeout(() => setConfirmDelete([file.key]), 50);
+        } else if (action === "copy") {
+          copyToClipboard([file.key]);
+          onNotify(translate("copiedToClipboard"), "success");
+        } else if (action === "cut") {
+          if (!requireAdmin()) return;
+          cutToClipboard([file.key]);
+          onNotify(translate("cutToClipboard"), "success");
+        }
+      } catch (error) {
+        onNotify(errorMessage(error), "error");
+      }
+    },
+    [
+      copyToClipboard,
+      cutToClipboard,
+      handleOpen,
+      navigateFolder,
+      onNotify,
+      requireAdmin,
+    ]
+  );
+
+  const {
+    handleRenameSubmit,
+    handleConfirmDelete,
+    handlePaste,
+    handleMove,
+    handleDropOnFolder,
+  } = useFileOperations({
+    folderActive: route.kind === "folder",
+    cwd,
+    clipboard,
+    renameTarget,
+    confirmDelete,
+    moveTarget,
+    onNotify,
+    loadListing,
+    clearClipboard,
+    setSelectedKeys,
+    setFocusedKey,
+    setPreviewFile,
+    setMoveTarget,
+    setConfirmDelete,
+    setRenameTarget,
+    enqueueToDir,
+  });
+
+  const openFilePicker = useCallback(() => {
+    if (!requireAdmin()) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "*/*";
+    input.multiple = true;
+    input.value = "";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.onchange = () => {
+      const picked = input.files ? Array.from(input.files) : [];
+      input.value = "";
+      input.remove();
+      if (picked.length) enqueueToCwd(picked);
+    };
+    input.click();
+  }, [enqueueToCwd, requireAdmin]);
+
+  const openFolderPicker = useCallback(async () => {
+    if (!requireAdmin()) return;
+    const picked = await selectDirectoryFiles();
+    if (picked.length) enqueueToCwd(picked);
+  }, [enqueueToCwd, requireAdmin]);
+
+  const handleDownload = useCallback(
+    (file: FileItem) => {
+      (file.isDir
+        ? downloadFolderArchive(file.key)
+        : downloadFile(file.key)
+      ).catch((error) => onNotify(errorMessage(error), "error"));
+    },
+    [onNotify]
+  );
+
+  const emptyMessage = useMemo(
+    () =>
+      debouncedSearch ? (
+        <EmptyState
+          variant="search"
+          icon={<SearchOffIcon />}
+          title={strings.noSearchResult}
+          description={strings.noSearchResultHint}
+          actions={
+            <Button variant="outlined" onClick={() => onSearchChange("")}>
+              {strings.clearSearch}
+            </Button>
+          }
+        />
+      ) : (
+        <EmptyState
+          variant="folder"
+          icon={<FolderOpenIcon />}
+          title={strings.noFiles}
+          description={strings.noFilesHint}
+          actions={
+            <>
+              <Button variant="contained" onClick={openFilePicker}>
+                {strings.upload}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  if (!requireAdmin()) return;
+                  setShowCreateFolder(true);
+                }}
+              >
+                {strings.createFolder}
+              </Button>
+            </>
+          }
+        />
+      ),
+    [debouncedSearch, onSearchChange, openFilePicker, requireAdmin]
+  );
+
+  const handleSectionChange = (next: ExplorerSection) => {
+    onSearchChange("");
+    if (next === "folder") {
+      navigate({ kind: "folder", path: lastFolderPath.current });
+    } else {
+      navigate({ kind: next });
+    }
+  };
+
+  const cutKeys =
+    clipboard?.mode === "cut" ? new Set(clipboard.keys) : undefined;
+  const canPaste = Boolean(
+    clipboard && clipboard.keys.length > 0 && route.kind === "folder"
+  );
+
+  useEffect(() => {
+    if (!pendingOpen || listingPending) return;
+    const found = files.find((item) => item.key === pendingOpen);
+    if (found) {
+      if (isPreviewable(found)) setPreviewFile(found);
+      else {
+        openFile(found.key).catch((error) =>
+          onNotify(errorMessage(error), "error")
+        );
+      }
+    } else {
+      onNotify(translate("recentMissing"), "error");
+    }
+    setPendingOpen(null);
+  }, [files, listingPending, onNotify, pendingOpen]);
+
+  return (
+    <Box
+      sx={{
+        flexGrow: 1,
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        sx={{
+          flexShrink: 0,
+          backgroundColor: "background.paper",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <ExplorerBar
+          section={section}
+          onSectionChange={handleSectionChange}
+          isAdmin={isAdmin}
+          onLogin={onLogin}
+          onUploadFile={openFilePicker}
+          onUploadFolder={openFolderPicker}
+          onCreateFolder={() => setShowCreateFolder(true)}
+          onPaste={handlePaste}
+          canPaste={canPaste}
+          clipboardCount={clipboard?.keys.length ?? 0}
+          clipboardMode={clipboard?.mode ?? null}
+          view={view}
+          onViewChange={onViewChange}
+          sort={sort}
+          onSortChange={onSortChange}
+          onOpenWebDav={() => setShowWebDav(true)}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          showHidden={showHidden}
+          onShowHiddenChange={setShowHidden}
+          density={density}
+          onDensityChange={setDensity}
+          recents={recents}
+          onOpenRecent={openRecent}
+        />
+        {route.kind === "folder" && (
+          <PathBar
+            cwd={cwd}
+            onNavigate={navigateFolder}
+            stats={listingStats}
+            searchScope={searchScope}
+            onSearchScopeChange={setSearchScope}
+            searchQuery={debouncedSearch}
+            onNotify={onNotify}
+          />
+        )}
+      </Box>
+
+      {route.kind === "trash" && (
+        <Box onScroll={handleContentScroll} sx={{ flexGrow: 1, minHeight: 0, overflowY: "auto", pb: { xs: 8, sm: 0 } }}>
+          <TrashView
+            onNotify={onNotify}
+            onGoFiles={() =>
+              navigate({ kind: "folder", path: lastFolderPath.current })
+            }
+          />
+        </Box>
+      )}
+
+      {route.kind === "folder" && (
+        <>
+          {listingPending ? (
+            <Box sx={{ flexGrow: 1, overflowY: "auto", minHeight: 220 }}>
+              <FileGridSkeleton view={view} density={density} />
+            </Box>
+          ) : (
+            <Box
+              onScroll={handleContentScroll}
+              sx={{
+                flexGrow: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                backgroundColor: "background.default",
+                pb: { xs: 8, sm: 0 },
+              }}
+            >
+              <FileGrid
+                files={visibleFiles}
+                view={view}
+                density={density}
+                folderCounts={folderCounts}
+                selectedKeys={selectedKeys}
+                dimmedKeys={cutKeys}
+                focusedKey={focusedKey}
+                highlight={debouncedSearch}
+                onToggleSelect={toggleSelect}
+                onNavigate={rememberFolder}
+                onOpen={handleOpen}
+                onOpenMenu={handleOpenMenu}
+                onDropOnFolder={handleDropOnFolder}
+                onDownload={handleDownload}
+                onDeleteFile={(file) => beginDelete([file.key])}
+                emptyMessage={emptyMessage}
+              />
+              {searchHasMore && (
+                <Stack
+                  alignItems="center"
+                  ref={loadMoreSentinelRef}
+                  sx={{ padding: 2, marginBottom: "48px" }}
+                >
+                  <CircularProgress size={22} />
+                </Stack>
+              )}
+              {isGlobalSearch && !searchHasMore && files.length > 0 && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  textAlign="center"
+                  display="block"
+                  sx={{ paddingBottom: 6 }}
+                >
+                  {strings.allLoaded}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </>
+      )}
+
+      <WebDavPanel
+        open={showWebDav}
+        onClose={() => setShowWebDav(false)}
+        onNotify={onNotify}
+      />
+
+      <CreateFolderDialog
+        open={showCreateFolder}
+        onClose={() => setShowCreateFolder(false)}
+        onSubmit={async (name) => {
+          try {
+            await createFolder(cwd, name);
+            setShowCreateFolder(false);
+            onNotify(translate("folderCreated"), "success");
+            await loadListing();
+          } catch (error) {
+            onNotify(errorMessage(error), "error");
+          }
+        }}
+      />
+
+      <FileActionSheet
+        file={contextMenu?.file ?? null}
+        anchorPosition={
+          contextMenu ? { top: contextMenu.y, left: contextMenu.x } : null
+        }
+        onClose={() => setContextMenu(null)}
+        onAction={handleContextAction}
+      />
+
+      <RenameDialog
+        open={Boolean(renameTarget)}
+        currentName={renameTarget?.name ?? ""}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={handleRenameSubmit}
+      />
+
+      <FileInfoSidebar
+        open={Boolean(detailsFile)}
+        file={detailsFile}
+        onClose={() => setDetailsFile(null)}
+        onNotify={onNotify}
+        onRename={(file) => {
+          setDetailsFile(null);
+          beginRename(file);
+        }}
+        onMove={(file) => {
+          setDetailsFile(null);
+          beginMove([file.key]);
+        }}
+        onDelete={(file) => {
+          setDetailsFile(null);
+          beginDelete([file.key]);
+        }}
+      />
+
+      {dropActive && route.kind === "folder" && (
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            zIndex: Z_INDEX.dragOverlay,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "surface.overlay",
+            border: "3px dashed",
+            borderColor: "primary.main",
+            pointerEvents: "none",
+          }}
+        >
+          <Box
+            sx={{
+              px: 3,
+              py: 2,
+              borderRadius: 2,
+              backgroundColor: "background.paper",
+              boxShadow: (theme) =>
+                warmShadow(theme.palette.mode === "dark", "0 8px 24px", 0.12),
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {strings.dropToUpload}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
+      <Suspense fallback={null}>
+        <PreviewDialog
+          file={previewFile}
+          siblings={previewSiblings}
+          onSibling={(file) => {
+            pushRecent({ key: file.key, name: file.name, isDir: false });
+            setPreviewFile(file);
+          }}
+          onClose={() => setPreviewFile(null)}
+          onNotify={onNotify}
+          onRename={() => {
+            if (previewFile) {
+              const target = previewFile;
+              setPreviewFile(null);
+              beginRename(target);
+            }
+          }}
+          onDelete={() => {
+            if (previewFile) setConfirmDelete([previewFile.key]);
+          }}
+          onSaved={loadListing}
+        />
+      </Suspense>
+
+      <MoveDialog
+        open={Boolean(moveTarget)}
+        sourceKeys={moveTarget ?? []}
+        onClose={() => setMoveTarget(null)}
+        onMove={handleMove}
+        onError={(error) => onNotify(error.message, "error")}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmDelete)}
+        title={translate("confirmDeleteTitle")}
+        message={translate("confirmDeleteMsg", { count: confirmDelete?.length ?? 0 })}
+        confirmText={translate("confirmAction")}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
+
+      <MobileNav
+        visible={selectedKeys.length === 0}
+        filesActive={route.kind === "folder"}
+        onGoFiles={() =>
+          navigate({ kind: "folder", path: lastFolderPath.current })
+        }
+        onUploadFile={openFilePicker}
+        onUploadFolder={openFolderPicker}
+        onCreateFolder={() => setShowCreateFolder(true)}
+        isAdmin={isAdmin}
+        onLogin={onLogin}
+      />
+
+      <MultiSelectToolbar
+        selectedKeys={selectedKeys}
+        onClose={() => setSelectedKeys([])}
+        onSelectAll={selectAll}
+        onDownload={async () => {
+          if (!selectedKeys.length) return;
+          try {
+            const single =
+              selectedKeys.length === 1
+                ? files.find((file) => file.key === selectedKeys[0])
+                : undefined;
+            if (single?.isDir === false) {
+              await downloadFile(selectedKeys[0]);
+            } else if (single?.isDir) {
+              await downloadFolderArchive(single.key);
+            } else {
+              await downloadSelectionArchive(selectedKeys, cwd);
+            }
+          } catch (error) {
+            onNotify(errorMessage(error), "error");
+          }
+        }}
+        onRename={() => {
+          if (selectedKeys.length !== 1) return;
+          const file = files.find((item) => item.key === selectedKeys[0]);
+          if (file) beginRename(file);
+        }}
+        onDelete={() => beginDelete(selectedKeys)}
+        onCopy={() => {
+          copyToClipboard(selectedKeys);
+          onNotify(translate("copiedToClipboard"), "success");
+        }}
+        onCut={() => {
+          if (!requireAdmin()) return;
+          cutToClipboard(selectedKeys);
+          onNotify(translate("cutToClipboard"), "success");
+        }}
+        onMove={() => beginMove(selectedKeys)}
+      />
+    </Box>
+  );
+}
+
+export default Main;

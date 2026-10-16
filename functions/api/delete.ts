@@ -1,0 +1,56 @@
+import {
+  DriveEnv,
+  requireWrite,
+  deleteDirectory,
+  isCollectionObject,
+  isInternalKey,
+  isTruthyParam,
+  jsonResponse,
+  normalizeDirKey,
+  resolveAsDirectory,
+  textResponse,
+} from "./_core";
+import { softDeleteKeys } from "./trash";
+
+type DeleteEnv = DriveEnv;
+
+export const onRequestDelete: PagesFunction<DeleteEnv> = async (context) => {
+  const { request, env } = context;
+  const denied = requireWrite(request, env);
+  if (denied) return denied;
+  const url = new URL(request.url);
+  const soft = isTruthyParam(url.searchParams.get("soft"));
+  const key = normalizeDirKey(url.searchParams.get("path"));
+  if (key instanceof Response) return key;
+  if (isInternalKey(key)) return textResponse("禁止访问内部目录", 400);
+
+  const head = await env.BUCKET.head(key);
+  const isDir = head !== null ? isCollectionObject(head) : await resolveAsDirectory(env.BUCKET, key);
+
+  if (head === null && !isDir) {
+    return textResponse("文件不存在", 404);
+  }
+
+  // 软删除：文件与目录都进回收站（复用网页端语义），可还原；
+  // 仅前缀的虚拟目录同样支持（softDeleteKeys 会记 virtualDir，还原时补 marker）
+  if (soft) {
+    const results = await softDeleteKeys(env.BUCKET, [key]);
+    if (results.length === 0) return textResponse("文件不存在", 404);
+    return jsonResponse({
+      key,
+      deleted: true,
+      soft: true,
+      // 与 GET /api/trash 列表项的 trashKey 字段同名同值，便于直接调 restore
+      trashKey: results[0].id,
+    });
+  }
+
+  if (head !== null && !isDir) {
+    await env.BUCKET.delete(key);
+    return jsonResponse({ key, deleted: true });
+  }
+
+  const deleted = await deleteDirectory(env.BUCKET, key);
+  if (deleted) return deleted;
+  return jsonResponse({ key, deleted: true, kind: "directory" });
+};
