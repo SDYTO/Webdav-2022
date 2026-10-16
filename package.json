@@ -30,6 +30,8 @@
     "preview": "node tools/local-preview.mjs",
     "preview:reset": "node tools/local-preview.mjs --reset",
     "smoke": "node tools/smoke-test.mjs",
+    "deploy": "node tools/deploy-cloudflare.mjs",
+    "deploy:dry": "node tools/deploy-cloudflare.mjs --dry-run",
     "preview:wrangler": "wrangler pages dev build"
   },
   "devDependencies": {

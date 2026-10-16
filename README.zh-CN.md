@@ -2,6 +2,9 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
 一个裁剪过的自建网盘：跑在 **Cloudflare Pages** 上（后端就是 Pages Functions，存储是 **Cloudflare R2**），并自带 **WebDAV** 入口。
 
 它是 [Davflare](https://github.com/lanshatop/Davflare) 的精简分支，只保留两件事和一套访问模型：
@@ -39,7 +42,56 @@
 
 > 原则是：**每个不存在的端点，就是一个不存在的漏洞。**
 
-## 部署到 Cloudflare Pages
+## 一键部署
+
+### 方式一：在 GitHub 上点一下（推荐）
+
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+
+点上面这个按钮 → 页面右侧 **Run workflow** → 填几个参数 → 剩下全自动：
+
+- R2 桶不存在就自动创建
+- Pages 项目不存在就自动创建
+- 把写操作口令写进 Pages 项目的加密 Secret
+- 构建并部署，结果直接写进这次运行的 Summary（含访问地址）
+
+**首次使用前**，到本仓库 `Settings → Secrets and variables → Actions` 添加这三个 Secret：
+
+| Secret | 必填 | 说明 |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | ✅ | 在 [API 令牌](https://dash.cloudflare.com/profile/api-tokens) 页面创建自定义令牌，权限至少给 `Cloudflare Pages: Edit`；要让工作流自动建桶，再加 `Workers R2 Storage: Edit` |
+| `CLOUDFLARE_ACCOUNT_ID` | 建议 | Cloudflare 账号 ID。账号下只有一个账号时可以留空 |
+| `ADMIN_PASSWORD` | 建议 | 写操作口令，建议 ≥ 20 位随机串。不设置也能部署成功，但所有写操作会返回 503（只读浏览不受影响） |
+
+> **为什么不用 Cloudflare 官方的「Deploy to Cloudflare」按钮？**
+> 因为官方按钮**只支持 Workers，不支持 Pages**。官方文档 Limitations 一节原文：
+> *"Pages applications: Deploy to Cloudflare buttons only support Workers applications."*
+> 本项目是 Pages + Pages Functions，所以用 GitHub Actions 做等价的一键入口——
+> 而且它比官方按钮管得更多：官方按钮不会帮你建桶、建项目、写口令。
+
+### 方式二：本地一条命令
+
+```bash
+export CLOUDFLARE_API_TOKEN=你的令牌          # Windows PowerShell: $env:CLOUDFLARE_API_TOKEN="..."
+npm run deploy
+```
+
+脚本会依次确认 R2 桶、Pages 项目、写操作口令，然后构建并部署。每一步都是幂等的，重复执行安全。
+想先看看它打算做什么、但不真的执行：
+
+```bash
+npm run deploy:dry
+```
+
+不传令牌也可以：本机执行过 `npx wrangler login` 时会直接复用登录态。完整参数见 `npm run deploy -- --help`。
+
+### 方式三：Cloudflare 控制台的 Git 集成
+
+Cloudflare 控制台 → Workers & Pages → Create → Pages → **Connect to Git** → 选中本仓库。
+构建命令 `npm run build`，输出目录 `build`，然后把 R2 桶绑定到变量名 `BUCKET`。
+配置完成后，每次 push 到生产分支都会自动重新部署。
+
+## 手动部署（逐步操作）
 
 1. 在 Cloudflare 账号里开通 R2，建一个桶（名字只能是小写字母 / 数字 / 连字符）。
 2. 建一个 Pages 项目并指向本仓库。框架预设选 **None**，构建命令 `npm run build`，产物目录 `build`（`wrangler.toml` 里的 `pages_build_output_dir` 已经是这个值）。
@@ -62,7 +114,7 @@
 
 > **R2 桶必须保持私有。** 它只应该通过 Pages 的绑定被访问。一旦开启桶的公共开发域名或自定义域，上面整套鉴权逻辑就全部被绕过了。
 
-### 命令行部署
+纯手工命令行等价操作：
 
 ```bash
 npm install
@@ -83,7 +135,7 @@ npm run smoke          # 对运行中的本地预览跑端到端冒烟测试
 
 `npm run smoke` 会逐条验证整套访问模型：匿名只读、无口令时写操作被拒、内部元数据前缀在 URL / API / WebDAV 三层都不可达、路径穿越被拒、回收站往返、分块上传，以及品牌相关端点。
 
-本地口令放在 `.dev.vars`（已被 git 忽略，纯本地，不是任何环境的凭据）。
+本地口令放在 `.dev.vars`（已被 git 忽略，纯本地，不是任何环境的凭据）——从 `.dev.vars.example` 复制一份即可开始。
 
 ## WebDAV
 
@@ -115,13 +167,14 @@ net use W: https://<你的域名>/webdav/ /user:admin <口令>
 ## 目录结构
 
 ```
+.github/workflows/  GitHub Actions —— 一键部署工作流
 functions/        Cloudflare Pages Functions —— 整个后端
   _middleware.ts    安全响应头、内部前缀拦截、探测路径
   api/              JSON API（list、stat、download、archive、upload、mkdir、rename、delete、trash、search、auth、branding）
   webdav/           WebDAV 协议实现与列表页
 src/              React 前端
 branding/         站点名 / Logo / 图标配置
-tools/            本地预览服务、冒烟测试、品牌构建脚本
+tools/            本地预览服务、冒烟测试、品牌构建脚本、一键部署脚本
 public/           静态资源与响应头配置
 ```
 

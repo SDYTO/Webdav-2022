@@ -2,6 +2,9 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
 A trimmed-down, self-hosted file drive on **Cloudflare Pages** (backend = Pages Functions, storage = **Cloudflare R2**), with a **WebDAV** endpoint built in.
 
 It is a fork of [Davflare](https://github.com/lanshatop/Davflare) reduced to two things and one access model:
@@ -39,7 +42,54 @@ Everything that was not file management or WebDAV is gone, together with its bac
 
 > The principle: **every endpoint that does not exist is a vulnerability that does not exist.**
 
-## Deploy to Cloudflare Pages
+## One-click deploy
+
+### Option 1 — one click on GitHub (recommended)
+
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+
+Click the button → **Run workflow** on the right → fill in a couple of fields → everything else is automatic:
+
+- creates the R2 bucket if it does not exist
+- creates the Pages project if it does not exist
+- stores the write password as an encrypted Pages secret
+- builds and deploys, then writes the URL into the run summary
+
+**Before the first run**, add these repository secrets under `Settings → Secrets and variables → Actions`:
+
+| Secret | Required | What it is |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | ✅ | Create a custom token at [API tokens](https://dash.cloudflare.com/profile/api-tokens) with at least `Cloudflare Pages: Edit`; add `Workers R2 Storage: Edit` if you want the workflow to create the bucket |
+| `CLOUDFLARE_ACCOUNT_ID` | recommended | Your Cloudflare account ID. Can be left empty when the token only sees one account |
+| `ADMIN_PASSWORD` | recommended | The write password, ideally 20+ random characters. Deployment still succeeds without it, but every write returns 503 (anonymous browsing is unaffected) |
+
+> **Why not Cloudflare's own "Deploy to Cloudflare" button?**
+> Because it **only supports Workers, not Pages**. The official docs, under Limitations,
+> state: *"Pages applications: Deploy to Cloudflare buttons only support Workers applications."*
+> This project is Pages + Pages Functions, so GitHub Actions serves as the equivalent
+> one-click entry point — and it does more: the official button will not create your
+> bucket, your project or your secret.
+
+### Option 2 — one command locally
+
+```bash
+export CLOUDFLARE_API_TOKEN=your-token     # Windows PowerShell: $env:CLOUDFLARE_API_TOKEN="..."
+npm run deploy
+```
+
+The script walks through the R2 bucket, the Pages project and the write password, then builds and deploys. Every step is idempotent, so re-running is safe. To see what it would do without doing it:
+
+```bash
+npm run deploy:dry
+```
+
+No token is needed if you have already run `npx wrangler login` on this machine — the script reuses that session. See `npm run deploy -- --help` for all options.
+
+### Option 3 — Cloudflare dashboard Git integration
+
+Cloudflare dashboard → Workers & Pages → Create → Pages → **Connect to Git** → pick this repository. Build command `npm run build`, output directory `build`, then bind your R2 bucket to the variable name `BUCKET`. Every push to the production branch then redeploys automatically.
+
+## Manual deployment
 
 1. Activate R2 in your Cloudflare account, then create a bucket (name must be lowercase letters / digits / hyphens).
 2. Create a Pages project and point it at this repository. Framework preset **None**, build command `npm run build`, output directory `build` (this is also what `wrangler.toml` declares via `pages_build_output_dir`).
@@ -62,7 +112,7 @@ Everything that was not file management or WebDAV is gone, together with its bac
 
 > **Keep the R2 bucket private.** It must only be reached through the Pages binding. Enabling the bucket's public development URL or a custom domain bypasses all of the authentication logic above.
 
-### Command-line deploy
+The fully manual command-line equivalent:
 
 ```bash
 npm install
@@ -83,7 +133,7 @@ npm run smoke          # end-to-end smoke test against the running preview
 
 `npm run smoke` asserts the whole access model — anonymous reads, writes rejected without a password, the internal metadata prefix being unreachable through the URL / API / WebDAV layers, path-traversal rejection, recycle-bin round-trips, chunked uploads, and the branding endpoints.
 
-Local credentials live in `.dev.vars` (git-ignored, local-only, not a deployment secret).
+Local credentials live in `.dev.vars` (git-ignored, local-only, not a deployment secret) — copy `.dev.vars.example` to get started.
 
 ## WebDAV
 
@@ -115,13 +165,14 @@ Either way, uploaded artwork is format-sniffed by content (never by extension), 
 ## Project layout
 
 ```
+.github/workflows/  GitHub Actions — the one-click deploy workflow
 functions/        Cloudflare Pages Functions — the whole backend
   _middleware.ts    security headers, internal-prefix blocking, probe paths
   api/              JSON API (list, stat, download, archive, upload, mkdir, rename, delete, trash, search, auth, branding)
   webdav/           WebDAV protocol implementation + listing page
 src/              React front end
 branding/         site name / logo / icon configuration
-tools/            local preview server, smoke test, branding build script
+tools/            local preview server, smoke test, branding build script, one-click deploy script
 public/           static assets and response headers
 ```
 
