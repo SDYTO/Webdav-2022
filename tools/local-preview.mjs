@@ -41,13 +41,13 @@ const generatedDir = path.join(here, ".generated");
  *     在放行的白名单内，删除直接走原生路径。于是模拟层可以自由增删对象，
  *     而**不需要关闭任何安全机制**。
  * 子目录名取项目路径的短哈希，避免同机多个项目互相串数据。
- * 需要固定位置时用 WABDAV_LOCAL_R2_DIR 覆盖。
+ * 需要固定位置时用 SD_YTODB_LOCAL_R2_DIR 覆盖。
  */
 const stateDir =
-  process.env.WABDAV_LOCAL_R2_DIR ||
+  process.env.SD_YTODB_LOCAL_R2_DIR ||
   path.join(
     os.tmpdir(),
-    "wabdav-2022-local-preview",
+    "sd-ytodb-local-preview",
     crypto.createHash("sha1").update(projectRoot).digest("hex").slice(0, 12)
   );
 const r2Dir = path.join(stateDir, "r2");
@@ -361,7 +361,7 @@ async function main() {
   });
 
   server.listen(PORT, "127.0.0.1", () => {
-    console.log(`Wabdav-2022 本地预览已启动： http://127.0.0.1:${PORT}/`);
+    console.log(`sd-ytodb 本地预览已启动： http://127.0.0.1:${PORT}/`);
     console.log(`  Functions: ${table.filter((e) => e.kind === "route").length} 个路由，${middlewares.length} 个中间件`);
     console.log(`  R2 本地目录: ${r2Dir}`);
   });

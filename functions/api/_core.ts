@@ -1,5 +1,5 @@
 /**
- * Wabdav-2022 共享网盘 —— 后端公共工具层。
+ * sd-ytodb 共享网盘 —— 后端公共工具层。
  *
  * 访问模型（只读免密 + 写操作口令）：
  *   - 读：目录列举 / 文件元数据 / 下载 / 搜索 / 打包下载 / 回收站列表 —— 完全免鉴权，
@@ -88,7 +88,7 @@ export function requireWrite(request: Request, env: DriveEnv): Response | null {
     return new Response("Unauthorized", {
       status: 401,
       headers: {
-        "WWW-Authenticate": 'Basic realm="Wabdav-2022", charset="UTF-8"',
+        "WWW-Authenticate": 'Basic realm="sd-ytodb", charset="UTF-8"',
         "Content-Type": "text/plain; charset=utf-8",
       },
     });

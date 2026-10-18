@@ -194,7 +194,7 @@ async function main() {
   if (!bucketName) die("无法确定 R2 桶名：wrangler.toml 里没有 bucket_name，也没有传 --bucket-name。");
   assertBucketName(bucketName);
 
-  console.log("\x1b[1mWabdav-2022 → Cloudflare Pages 一键部署\x1b[0m");
+  console.log("\x1b[1msd-ytodb → Cloudflare Pages 一键部署\x1b[0m");
   log.info(`Pages 项目：${projectName}`);
   log.info(`R2 桶　　：${bucketName}`);
   log.info(`分支　　 ：${options.branch}`);

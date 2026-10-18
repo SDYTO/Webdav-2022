@@ -24,9 +24,9 @@ export interface Branding {
 }
 
 export const BRANDING: Branding = {
-  "siteName": "Wabdav-2022",
-  "shortName": "Wabdav-2022",
-  "description": "Wabdav-2022 共享网盘 —— 文件管理与 WebDAV",
+  "siteName": "sd-ytodb",
+  "shortName": "sd-ytodb",
+  "description": "sd-ytodb 共享网盘 —— 文件管理与 WebDAV",
   "showNameBesideLogo": true,
   "logoUrl": null,
   "logoAspectRatio": null,

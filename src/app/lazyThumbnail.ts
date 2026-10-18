@@ -54,7 +54,7 @@ export function lazyThumbnailId(file: Pick<FileItem, "key" | "size" | "uploaded"
 function cacheRequestUrl(id: string): string {
   // 仅作 Cache Storage 的键使用，不会真的发起网络请求；
   // 但仍用合法的绝对 URL，且路径不带任何上游项目痕迹。
-  return `${location.origin}/__wabdav-2022_thumbnail__/${encodeURIComponent(id)}`;
+  return `${location.origin}/__sd-ytodb_thumbnail__/${encodeURIComponent(id)}`;
 }
 
 export interface LazyThumbnailDeps {

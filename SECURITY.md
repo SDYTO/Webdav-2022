@@ -1,6 +1,6 @@
-# Wabdav-2022 安全风险隔离说明
+# sd-ytodb 安全风险隔离说明
 
-> 本文档说明 Wabdav-2022（基于 Davflare 裁剪）在「WebDAV 读免密 + 主站需登录 + 写操作口令」模型下
+> 本文档说明 sd-ytodb（基于 Davflare 裁剪）在「WebDAV 读免密 + 主站需登录 + 写操作口令」模型下
 > 做了哪些安全隔离，以及部署到 Cloudflare 时需要额外注意的事项。
 
 ---

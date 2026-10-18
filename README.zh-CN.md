@@ -1,8 +1,8 @@
-# Wabdav-2022
+# sd-ytodb
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/sd-ytodb/actions/workflows/deploy-cloudflare-pages.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 一个裁剪过的自建网盘：跑在 **Cloudflare Pages** 上（后端就是 Pages Functions，存储是 **Cloudflare R2**），并自带 **WebDAV** 入口。
@@ -46,7 +46,7 @@
 
 ### 方式一：在 GitHub 上点一下（推荐）
 
-[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/sd-ytodb/actions/workflows/deploy-cloudflare-pages.yml)
 
 点上面这个按钮 → 页面右侧 **Run workflow** → 填几个参数 → 剩下全自动：
 

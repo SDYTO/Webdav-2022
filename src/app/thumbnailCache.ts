@@ -2,7 +2,7 @@
 // 应用启动时（App 挂载）就能挂上，不用等第一次加载缩略图（#184）。
 import { getCredentials, subscribeAuth } from "./auth";
 
-export const THUMBNAIL_CACHE_NAME = "wabdav-2022-thumbnails-v1";
+export const THUMBNAIL_CACHE_NAME = "sd-ytodb-thumbnails-v1";
 
 /** 各生成器的内存清理（清内存缓存 + 回收 object URL） */
 const memoryClearers = new Set<() => void>();

@@ -1,8 +1,8 @@
 {
-  "name": "wabdav-2022",
+  "name": "sd-ytodb",
   "version": "1.0.0",
   "private": true,
-  "description": "Wabdav-2022 —— 基于 Cloudflare R2 的共享网盘：只读免密的文件管理与 WebDAV",
+  "description": "sd-ytodb —— 基于 Cloudflare R2 的共享网盘：只读免密的文件管理与 WebDAV",
   "dependencies": {
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",

@@ -35,7 +35,7 @@ function brandingHtmlPlugin() {
   };
 
   return {
-    name: "wabdav-2022-branding-html",
+    name: "sd-ytodb-branding-html",
     transformIndexHtml(html: string) {
       let output = html;
       output = swap(

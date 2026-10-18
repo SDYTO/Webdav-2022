@@ -620,7 +620,7 @@ const entries: Record<string, DictionaryEntry> = {
   language: { zh: "语言", en: "Language" },
   langZh: { zh: "中文", en: "中文" },
   langEn: { zh: "English", en: "English" },
-  loginTitle: { zh: "登录 Wabdav-2022", en: "Sign in to Wabdav-2022" },
+  loginTitle: { zh: "登录 sd-ytodb", en: "Sign in to sd-ytodb" },
   loginHint: {
     zh: "请输入 WebDAV 用户名和密码以访问你的文件。",
     en: "Enter your WebDAV username and password to access your files.",

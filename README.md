@@ -1,8 +1,8 @@
-# Wabdav-2022
+# sd-ytodb
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/sd-ytodb/actions/workflows/deploy-cloudflare-pages.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 A trimmed-down, self-hosted file drive on **Cloudflare Pages** (backend = Pages Functions, storage = **Cloudflare R2**), with a **WebDAV** endpoint built in.
@@ -46,7 +46,7 @@ Everything that was not file management or WebDAV is gone, together with its bac
 
 ### Option 1 — one click on GitHub (recommended)
 
-[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/Wabdav-2022/actions/workflows/deploy-cloudflare-pages.yml)
+[![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/sd-ytodb/actions/workflows/deploy-cloudflare-pages.yml)
 
 Click the button → **Run workflow** on the right → fill in a couple of fields → everything else is automatic:
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Wabdav-2022 品牌构建脚本。
+ * sd-ytodb 品牌构建脚本。
  *
  * 读取 `branding/config.json` 与 `branding/` 目录下的素材文件，产出三样东西：
  *
@@ -39,9 +39,9 @@ const manifestPath = path.join(publicDir, "manifest.json");
 
 /** config.json 缺省值，同时也是「合法字段白名单」。 */
 const DEFAULTS = {
-  siteName: "Wabdav-2022",
-  shortName: "Wabdav-2022",
-  description: "Wabdav-2022 共享网盘 —— 文件管理与 WebDAV",
+  siteName: "sd-ytodb",
+  shortName: "sd-ytodb",
+  description: "sd-ytodb 共享网盘 —— 文件管理与 WebDAV",
   showNameBesideLogo: true,
   logo: null,
   icon: null,

@@ -106,7 +106,7 @@ async function main() {
     const res = await req("/");
     const html = await res.text();
     check("GET / 返回 200", res.status === 200, `status=${res.status}`);
-    check("首页是 Wabdav-2022 的 HTML", html.includes("<title>Wabdav-2022</title>"));
+    check("首页是 sd-ytodb 的 HTML", html.includes("<title>sd-ytodb</title>"));
     check("X-Content-Type-Options: nosniff", res.headers.get("x-content-type-options") === "nosniff");
     check("X-Frame-Options: DENY", res.headers.get("x-frame-options") === "DENY");
     check("Referrer-Policy: no-referrer", res.headers.get("referrer-policy") === "no-referrer");
@@ -214,7 +214,7 @@ async function main() {
     );
 
     const form = new FormData();
-    form.append("file", new File([Buffer.from("hello wabdav-2022 你好")], "说明.txt", { type: "text/plain" }));
+    form.append("file", new File([Buffer.from("hello sd-ytodb 你好")], "说明.txt", { type: "text/plain" }));
     const upload = await req(`/api/upload?path=${enc(DIR)}`, {
       method: "POST",
       headers: { Authorization: basic() },
@@ -243,7 +243,7 @@ async function main() {
     const download = await req(`/api/download?path=${enc(FILE)}`);
     const text = await download.text();
     check("匿名下载文件 → 200", download.status === 200, `status=${download.status}`);
-    check("下载内容正确（UTF-8 往返无损）", text === "hello wabdav-2022 你好", JSON.stringify(text));
+    check("下载内容正确（UTF-8 往返无损）", text === "hello sd-ytodb 你好", JSON.stringify(text));
     check(
       "下载带 Content-Disposition",
       (download.headers.get("content-disposition") || "").includes("attachment")

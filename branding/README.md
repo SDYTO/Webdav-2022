@@ -1,6 +1,6 @@
 # 自定义品牌（Logo / 图标 / 站点名）
 
-把 Wabdav-2022 换成你自己的样子。有两种方式，按需选：
+把 sd-ytodb 换成你自己的样子。有两种方式，按需选：
 
 ## 方式一：界面里改（推荐，无需重新部署）
 
@@ -60,9 +60,9 @@ npm run preview   # 本地看一眼效果
 
 | 字段 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `siteName` | string | `"Wabdav-2022"` | 站点名。顶栏、浏览器标题、PWA 名称、WebDAV 浏览页标题都用它。最长 60 字符 |
+| `siteName` | string | `"sd-ytodb"` | 站点名。顶栏、浏览器标题、PWA 名称、WebDAV 浏览页标题都用它。最长 60 字符 |
 | `shortName` | string | 同 `siteName` | PWA 主屏短名，建议 ≤ 12 字符，太长会被系统截断。最长 24 字符 |
-| `description` | string | Wabdav-2022 默认描述 | 页面 `description` 与 PWA 描述。最长 200 字符 |
+| `description` | string | sd-ytodb 默认描述 | 页面 `description` 与 PWA 描述。最长 200 字符 |
 | `showNameBesideLogo` | boolean | `true` | Logo 旁边是否再显示一遍站点名。**Logo 本身已经写了字就设成 `false`**，否则会重复两遍 |
 | `logo` | string \| null | `null` | Logo 文件名。填 `null` 表示不用图片，顶栏直接显示纯文字站名 |
 | `icon` | string \| null | `null` | 站点图标（favicon）文件名。`null` 时用内置的 `/favicon.png` |
@@ -146,4 +146,4 @@ localStorage（写操作口令存在那里）。
 
 **改坏了怎么回退？**
 
-把 `config.json` 里对应字段改回 `null`（或直接删掉字段）即可 —— 会恢复成内置图标与「Wabdav-2022」站名。
+把 `config.json` 里对应字段改回 `null`（或直接删掉字段）即可 —— 会恢复成内置图标与「sd-ytodb」站名。
