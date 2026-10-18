@@ -11,13 +11,13 @@ It is a fork of [Davflare](https://github.com/lanshatop/Davflare) reduced to two
 
 - **File management** — browse, upload, create folders, rename, move, delete, search, preview, recycle bin.
 - **WebDAV** — mount the same bucket as a network drive / sync target (Obsidian, rclone, Windows Explorer, …).
-- **Read is anonymous, writes need a password.** Anyone with the link can browse and download; anything that changes data sits behind a single admin password.
+- **The web UI requires sign-in; WebDAV reads stay open.** The main site renders nothing but the login screen until the admin signs in (no app shell, no data requests). WebDAV reads remain anonymous for sharing, and everything that changes data sits behind a single admin password.
 
 ## Access model
 
 | Operation | Anonymous visitor | Password holder |
 | --- | --- | --- |
-| Browse / search / download / zip a folder | ✅ | ✅ |
+| Web UI (main site) | ❌ login screen only | ✅ |
 | WebDAV read (`OPTIONS` / `PROPFIND` / `GET`) | ✅ | ✅ |
 | Upload / new folder / rename / move | ❌ 401 | ✅ |
 | Delete / recycle bin / restore / empty | ❌ 401 | ✅ |

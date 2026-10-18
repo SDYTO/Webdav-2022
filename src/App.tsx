@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   CssBaseline,
   Snackbar,
   Stack,
@@ -12,9 +13,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BrandingDialog from "./BrandingDialog";
 import Header from "./Header";
 import LoginDialog from "./LoginDialog";
+import LoginGate from "./LoginGate";
 import Main from "./Main";
 import TransferManager from "./TransferManager";
-import { AuthProvider, subscribeAuthRequired, useAuth } from "./app/auth";
+import {
+  AuthProvider,
+  basicAuthHeader,
+  clearCredentials,
+  subscribeAuthRequired,
+  useAuth,
+} from "./app/auth";
 import { loadBranding } from "./app/branding";
 import { installThumbnailCacheCleanup } from "./app/thumbnailCache";
 import { ClipboardProvider } from "./app/clipboard";
@@ -79,6 +87,45 @@ function AppContent({
   useLang();
   const { username, isAdmin, logout } = useAuth();
   const transferQueue = useTransferQueue();
+
+  // 登录门禁：主站内容只有管理员登录后才渲染。
+  // - guest：显示全屏登录页，主界面与全部数据请求都不存在；
+  // - checking：本地有历史凭据，先经 /api/auth 校验，期间也不渲染任何内容；
+  // - ok：校验通过（或本次登录成功），才挂载主界面。
+  const [sessionState, setSessionState] = useState<"checking" | "ok" | "guest">(
+    username ? "checking" : "guest"
+  );
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setSessionState("guest");
+      return;
+    }
+    let cancelled = false;
+    setSessionState("checking");
+    (async () => {
+      try {
+        const authorization = basicAuthHeader();
+        const response = await fetch("/api/auth", {
+          headers: authorization ? { Authorization: authorization } : {},
+        });
+        if (cancelled) return;
+        if (response.ok) {
+          setSessionState("ok");
+        } else {
+          // 缓存的凭据已失效（口令轮换过）：清掉并回到登录页。
+          clearCredentials();
+          setSessionState("guest");
+        }
+      } catch {
+        if (!cancelled) setSessionState("guest");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
   const [route, navigate] = useHashRoute();
   const [search, setSearch] = useState("");
   const [showTransfers, setShowTransfers] = useState(false);
@@ -177,6 +224,26 @@ function AppContent({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // 登录门禁分流：未通过校验前，Header / Main / 传输面板一概不挂载。
+  if (sessionState !== "ok") {
+    if (sessionState === "checking") {
+      return (
+        <Box
+          sx={{
+            minHeight: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "background.default",
+          }}
+        >
+          <CircularProgress aria-label={strings.loading} />
+        </Box>
+      );
+    }
+    return <LoginGate />;
+  }
 
   return (
     <Stack sx={{ height: "100%", minHeight: 0, overflow: "hidden", backgroundColor: "background.default" }}>
