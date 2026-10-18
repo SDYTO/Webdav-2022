@@ -65,6 +65,12 @@ Everything that was not file management or WebDAV is gone, together with its bac
 | `CLOUDFLARE_ACCOUNT_ID` | recommended | Your Cloudflare account ID. Can be left empty when the token only sees one account |
 | `ADMIN_PASSWORD` | recommended | The write password, ideally 20+ random characters. Deployment still succeeds without it, but every write returns 503 (anonymous browsing is unaffected) |
 
+> **The value of the `ADMIN_PASSWORD` secret *is* the live password.**
+> Change it and you must **re-run this workflow** for it to take effect (Pages secrets are
+> shipped with a new deployment). The final "post-deploy verification" step logs in with that
+> secret for real, so a mismatch turns the run red instead of silently shipping a site nobody
+> can log into.
+
 > **Why not Cloudflare's own "Deploy to Cloudflare" button?**
 > Because it **only supports Workers, not Pages**. The official docs, under Limitations,
 > state: *"Pages applications: Deploy to Cloudflare buttons only support Workers applications."*

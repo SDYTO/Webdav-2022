@@ -65,6 +65,11 @@
 | `CLOUDFLARE_ACCOUNT_ID` | 建议 | Cloudflare 账号 ID。账号下只有一个账号时可以留空 |
 | `ADMIN_PASSWORD` | 建议 | 写操作口令，建议 ≥ 20 位随机串。不设置也能部署成功，但所有写操作会返回 503（只读浏览不受影响） |
 
+> **`ADMIN_PASSWORD` 这个 Secret 的值就是线上真实口令。**
+> 改了它必须**重新跑一次本工作流**才会生效（Pages 的 Secret 要随新部署下发）；
+> 只改 Secret 不重跑，线上仍是旧口令。工作流末尾的「部署后自校验」会用这个 Secret
+> 真实登录一次，因此口令不一致会直接报红，不会出现「部署成功但登不进去」。
+
 > **为什么不用 Cloudflare 官方的「Deploy to Cloudflare」按钮？**
 > 因为官方按钮**只支持 Workers，不支持 Pages**。官方文档 Limitations 一节原文：
 > *"Pages applications: Deploy to Cloudflare buttons only support Workers applications."*

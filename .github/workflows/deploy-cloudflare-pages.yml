@@ -141,6 +141,8 @@ jobs:
           fi
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler pages secret put ADMIN_PASSWORD --project-name "$PROJECT"
           echo "✓ 写操作口令已写入（加密 Secret，不会出现在构建日志里）"
+          # 只打印长度，便于核对「Secret 是不是空的/被改过」，不泄露内容
+          echo "  口令长度：${#ADMIN_PASSWORD} 位"
 
       - name: 构建
         run: npm run build
@@ -153,6 +155,50 @@ jobs:
           URL="$(grep -oE 'https://[A-Za-z0-9.-]+\.pages\.dev' deploy.log | tail -1 || true)"
           echo "url=${URL}" >> "$GITHUB_OUTPUT"
           echo "部署地址：${URL:-（未从输出中解析到，请到 Cloudflare 控制台查看）}"
+
+      - name: 部署后自校验
+        if: always() && steps.deploy.outputs.url != ''
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -uo pipefail
+          BASE="${{ steps.deploy.outputs.url }}"
+          fail=0
+          check() { # $1=名称 $2=期望码 $3=实际码
+            if [ "$2" = "$3" ]; then
+              echo "✓ $1：HTTP $3"
+            else
+              echo "::error::$1 期望 HTTP $2，实际 HTTP $3"
+              fail=1
+            fi
+          }
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/")
+          check "首页可访问" 200 "$code"
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X PROPFIND -H 'Depth: 1' "$BASE/webdav/")
+          check "WebDAV 匿名读取" 207 "$code"
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/api/auth")
+          check "匿名登录校验被拒" 401 "$code"
+
+          if [ -n "${ADMIN_PASSWORD:-}" ]; then
+            # 用 Secret 里的口令实际登录一次：这是「部署成功但登不进去」的唯一可靠判据
+            b64=$(printf '%s' "admin:${ADMIN_PASSWORD}" | base64 -w0)
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H "Authorization: Basic $b64" "$BASE/api/auth")
+            if [ "$code" = "200" ]; then
+              echo "✓ 口令登录校验：HTTP 200"
+            else
+              echo "::error::口令登录校验失败（HTTP $code，期望 200）。"
+              echo "::error::最常见原因：Secret ADMIN_PASSWORD 的值不是你要用的口令，或本次运行没有同步口令。"
+              echo "::error::修复：Settings → Secrets and variables → Actions → 检查 ADMIN_PASSWORD，"
+              echo "::error::然后用 sync_admin_password=true 手动重跑本工作流。"
+              echo "::error::注意：Secret 里的值就是线上真实口令，改了 Secret 必须重跑部署才会生效。"
+              fail=1
+            fi
+          fi
+
+          exit $fail
 
       - name: 写入部署摘要
         if: always()
