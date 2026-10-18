@@ -84,7 +84,7 @@ jobs:
       - name: 准备 Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: 安装依赖
@@ -101,7 +101,7 @@ jobs:
       - name: 确保 R2 桶存在
         run: |
           set -euo pipefail
-          if npx wrangler r2 bucket info "$BUCKET" >/dev/null 2>&1; then
+          if npx wrangler r2 bucket list 2>/dev/null | grep -qE "(^|[[:space:]])${BUCKET}([[:space:]]|$)"; then
             echo "✓ R2 桶已存在：$BUCKET"
           elif [ "${{ inputs.create_bucket }}" = "true" ]; then
             echo "→ 创建 R2 桶：$BUCKET"
