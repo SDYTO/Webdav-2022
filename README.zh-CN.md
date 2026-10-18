@@ -48,7 +48,9 @@
 
 [![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/sd-ytodb/actions/workflows/deploy-cloudflare-pages.yml)
 
-点上面这个按钮 → 页面右侧 **Run workflow** → 填几个参数 → 剩下全自动：
+**日常更新**：直接推送到 `main`，工作流自动构建并部署（无需点按钮）。
+
+**手动部署**：点上面这个按钮 → 页面右侧 **Run workflow** → 填几个参数 → 剩下全自动：
 
 - R2 桶不存在就自动创建
 - Pages 项目不存在就自动创建

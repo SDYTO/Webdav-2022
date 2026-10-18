@@ -11,6 +11,10 @@ name: Deploy to Cloudflare Pages
 # 自动建 R2 桶、自动建 Pages 项目、自动写入写操作口令、构建并部署。
 
 on:
+  # 推送到 main 即自动部署（日常更新走这条）
+  push:
+    branches: [main]
+  # 也可手动触发，并自定义项目名 / 桶名等参数
   workflow_dispatch:
     inputs:
       project_name:
@@ -54,9 +58,11 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PROJECT: ${{ inputs.project_name }}
-      BUCKET: ${{ inputs.bucket_name }}
-      BRANCH: ${{ inputs.branch }}
+      # push 触发时 inputs 为空，回落到生产默认值（项目 ytodb / 桶 ytodb / main）
+      PROJECT: ${{ inputs.project_name || 'ytodb' }}
+      BUCKET: ${{ inputs.bucket_name || 'ytodb' }}
+      BRANCH: ${{ inputs.branch || 'main' }}
+      CREATE_BUCKET: ${{ github.event_name == 'push' && 'true' || inputs.create_bucket }}
 
     steps:
       - name: 校验必填凭证
@@ -103,7 +109,7 @@ jobs:
           set -euo pipefail
           if npx wrangler r2 bucket list 2>/dev/null | grep -qE "(^|[[:space:]])${BUCKET}([[:space:]]|$)"; then
             echo "✓ R2 桶已存在：$BUCKET"
-          elif [ "${{ inputs.create_bucket }}" = "true" ]; then
+          elif [ "${CREATE_BUCKET}" = "true" ]; then
             echo "→ 创建 R2 桶：$BUCKET"
             npx wrangler r2 bucket create "$BUCKET"
             echo "✓ R2 桶已创建"
@@ -124,7 +130,7 @@ jobs:
           fi
 
       - name: 同步写操作口令
-        if: ${{ inputs.sync_admin_password }}
+        if: ${{ inputs.sync_admin_password || github.event_name == 'push' }}
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |

@@ -48,7 +48,9 @@ Everything that was not file management or WebDAV is gone, together with its bac
 
 [![Deploy to Cloudflare Pages](https://img.shields.io/badge/Deploy%20to%20Cloudflare%20Pages-Actions-2563EB?logo=cloudflare&logoColor=white)](https://github.com/SDYTO/sd-ytodb/actions/workflows/deploy-cloudflare-pages.yml)
 
-Click the button → **Run workflow** on the right → fill in a couple of fields → everything else is automatic:
+**Everyday updates**: push to `main` and the workflow builds and deploys automatically.
+
+**Manual deploy**: click the button → **Run workflow** on the right → fill in a couple of fields → everything else is automatic:
 
 - creates the R2 bucket if it does not exist
 - creates the Pages project if it does not exist
